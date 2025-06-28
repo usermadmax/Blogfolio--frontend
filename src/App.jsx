@@ -1,50 +1,20 @@
-import { useState, useEffect, useRef } from 'react'
-import Blog from './components/Blog'
+// --- App.jsx ---
+import { useState, useEffect } from 'react'
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import blogService from './services/blogs'
-import loginService from './services/login'
-import BlogForm from './components/BlogForm'
-import Togglable from './components/Togglable'
-import LoginForm from './components/LoginForm'
-const App = () => {
-  const [blogs, setBlogs] = useState([])
-  const [username, setUsername] = useState('')
-  const [password, setPassword] = useState('')
+import Navbar from './components/Navbar'
+import Home from './pages/Home'
+import Login from './pages/Login'
+import Register from './pages/Register'
+import CreateBlog from './pages/CreateBlog'
+import MyBlogs from './components/MyBlogs'
+import Spinner from './components/Spinner'
+import Footer from './components/Footer'
+
+function App() {
   const [user, setUser] = useState(null)
-  const [errorMessage, setErrorMessage] = useState(null)
-  // handle like
-  const handleLike = async (blogToUpdate) => {
-  try {
-    const updatedBlog = {
-      user: blogToUpdate.user.id,           // ✅ send only the ID
-      likes: blogToUpdate.likes + 1,
-      author: blogToUpdate.author,
-      title: blogToUpdate.title,
-      url: blogToUpdate.url
-    }
-
-    const returnedBlog = await blogService.update(blogToUpdate.id || blogToUpdate._id, updatedBlog)
-
-    // Replace old blog with updated one in state
-    setBlogs(blogs.map(blog =>
-      (blog.id || blog._id) === (returnedBlog.id || returnedBlog._id) ? returnedBlog : blog
-    ))
-  } catch (error) {
-    console.error('Failed to like blog:', error.message)
-    setErrorMessage('Error updating like count')
-    setTimeout(() => setErrorMessage(null), 5000)
-  }
-}
-
-
-  const blogFormRef = useRef()
-  // Load blogs
-  useEffect(() => {
-    blogService.getAll().then(initialBlogs => {
-      setBlogs(initialBlogs)
-    })
-  }, [])
-
-  // Check if user is already logged in
+  const [blogs, setBlogs] = useState([])
+  const [loading, setLoading] = useState(true)
   useEffect(() => {
     const loggedUserJSON = window.localStorage.getItem('loggedBlogappUser')
     if (loggedUserJSON) {
@@ -52,88 +22,39 @@ const App = () => {
       setUser(user)
       blogService.setToken(user.token)
     }
+    setLoading(false)
   }, [])
 
-  // Login handler
-  const handleLogin = async (event) => {
-    event.preventDefault()
-    console.log('logging in with', username, password)
 
+  const createBlog = async (blogObject) => {
     try {
-      const user = await loginService.login({ username, password })
-      window.localStorage.setItem('loggedBlogappUser', JSON.stringify(user))
-      blogService.setToken(user.token)
-      setUser(user)
-      setUsername('')
-      setPassword('')
-    } catch (error) {
-      console.error('Login failed:', error.response?.data || error.message)
-      setErrorMessage('Wrong credentials')
-      setTimeout(() => {
-        setErrorMessage(null)
-      }, 5000)
+      const newBlog = await blogService.create(blogObject)
+      setBlogs(prev => [...prev, newBlog])
+    } catch (err) {
+      alert('Failed to create blog')
     }
   }
-
-  // Logout handler
-  const handleLogout = () => {
-    window.localStorage.removeItem('loggedBlogappUser')
-    setUser(null)
-  }
-
-
-
- 
-
-  // Blogs list
-  const blogsList = () => (
-    <div>
-      <h2>blogs</h2>
-      {blogs.map(blog =>
-        <Blog key={blog.id || blog._id} blog={blog} onLike={handleLike}/>
-      )}
-    </div>
-  )
-  const addBlog = (blogObject) => {
-
-
-    blogService
-      .create(blogObject)
-      .then(returnedNote => {
-        setBlogs(blogs.concat(returnedNote))
-        blogFormRef.current.toggleVisibility()
-      })
-  }
-
+  if (loading) return <Spinner />
   return (
-    <div>
-      <h1>Blog App</h1>
+    <Router>
+     
+      <div className="  flex flex-col min-h-screen ">
+         <Navbar user={user} setUser={setUser} />
+        <div className="flex-grow ">
+          <Routes>
+            <Route path="/" element={<Navigate to="/blogs" />} />
+            <Route path="/blogs" element={user ? <Home user={user} /> : <Navigate to="/login" />} />
+            <Route path="/myblogs" element={user ? <MyBlogs user={user} /> : <Navigate to="/login" />} />
+            <Route path="/create" element={user ? <CreateBlog createBlog={createBlog} /> : <Navigate to="/login" />} />
+            <Route path="/login" element={<Login setUser={setUser} />} />
+            <Route path="/register" element={<Register />} />
+          </Routes>
+        </div>
+        <Footer />
+      </div>
 
-      {errorMessage && (
-        <p style={{ color: 'red' }}>{errorMessage}</p>
-      )}
-
-      {user === null
-        ? <Togglable buttonLabel="login">
-          <LoginForm
-            username={username}
-            password={password}
-            handleUsernameChange={({ target }) => setUsername(target.value)}
-            handlePasswordChange={({ target }) => setPassword(target.value)}
-            handleSubmit={handleLogin}
-          />
-        </Togglable>
-        : (
-          <div>
-            <p>{user.name} logged in <button onClick={handleLogout}>logout</button></p>
-            <Togglable buttonLabel="new blog" ref={blogFormRef}>
-              <BlogForm createBlog={addBlog} />
-            </Togglable> {blogsList()}
-          </div>
-        )
-      }
-    </div>
+    </Router>
   )
 }
 
-export default App
+export default App;
