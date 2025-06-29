@@ -7,7 +7,7 @@ export default defineConfig({
   server: {
     proxy: {
       "/api": {
-        target: "http://localhost:3004",
+        target: "https://blogfolio-backend-nb1t.onrender.com",
         changeOrigin: true,
       },
     },
